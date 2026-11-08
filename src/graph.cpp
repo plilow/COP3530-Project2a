@@ -70,29 +70,41 @@ void Graph::addActor(int id, const std::string& name) {
     actors.push_back({id, name});
     adjacency.emplace_back();
     indexById[id] = index;
-    indicesByName[toLower(name)].push_back(index);
+    indexByName[toLower(name)].push_back(index);
 }
 
 void Graph::addMovie(int id, const std::string& title, int year, const std::vector<int>& castIds) {
     int movieIndex = movieCount();
     movies.push_back({id, title, year});
 
-    std::vector<int> cast;
-    for (int castId : castIds) {
-        int index = findActorById(castId);
+    //Each cast member's actor index and billing position (0 = top billed).
+    //The position comes from the original list, so it is recorded before anything is filtered or sorted
+    struct CastMember {
+        int actor;
+        int billing;
+    };
+    std::vector<CastMember> cast;
+    for (size_t position = 0; position < castIds.size(); position++) {
+        int index = findActorById(castIds[position]);
         if (index != -1) {
-            cast.push_back(index);
+            cast.push_back({index, static_cast<int>(position)});
         }
     }
 
-    //Removes duplicates to ensure no loops
-    std::sort(cast.begin(), cast.end());
-    cast.erase(std::unique(cast.begin(), cast.end()), cast.end());
+    //Removes duplicates to ensure no loops. Sorting by actor, then billing, puts each actor's
+    //best billing first, and std::unique keeps that one
+    std::sort(cast.begin(), cast.end(), [](const CastMember& a, const CastMember& b) {
+        return a.actor != b.actor ? a.actor < b.actor : a.billing < b.billing;
+    });
+    cast.erase(std::unique(cast.begin(), cast.end(),
+                           [](const CastMember& a, const CastMember& b) { return a.actor == b.actor; }),
+               cast.end());
 
     for (size_t i = 0; i < cast.size(); i++) {
         for (size_t j = i + 1; j < cast.size(); j++) {
-            adjacency[cast[i]].push_back({cast[j], movieIndex});
-            adjacency[cast[j]].push_back({cast[i], movieIndex});
+            int weight = cast[i].billing + cast[j].billing;
+            adjacency[cast[i].actor].push_back({cast[j].actor, movieIndex, weight});
+            adjacency[cast[j].actor].push_back({cast[i].actor, movieIndex, weight});
         }
     }
 }
@@ -103,6 +115,6 @@ int Graph::findActorById(int id) const {
 }
 
 std::vector<int> Graph::findActorsByName(const std::string& name) const {
-    auto it = indicesByName.find(toLower(name));
-    return it == indicesByName.end() ? std::vector<int>{} : it->second;
+    auto it = indexByName.find(toLower(name));
+    return it == indexByName.end() ? std::vector<int>{} : it->second;
 }

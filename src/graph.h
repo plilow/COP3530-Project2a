@@ -20,6 +20,10 @@ struct Movie {
 struct Edge {
     int neighbor;
     int movie;
+    //Billing-order weight: i + j, where i and j are the two actors' 0-based positions
+    //in the movie's cast list. Lower is a stronger connection. Positions differ, so the
+    //weight is always at least 1 (the top two billed) and at most 27 (the bottom two of 15)
+    int weight;
 };
 
 //Undirected graph stored as an adjacency list
@@ -33,7 +37,8 @@ public:
     void addActor(int id, const std::string& name);
 
     //Connects every pair of actors in the cast
-    //Cast ids that don't match a known actor are ignored
+    //castIds must be in billing order (leads first); edge weights come from each actor's position
+    //Cast ids that don't match a known actor are ignored, but they still take up a billing position
     void addMovie(int id, const std::string& title, int year, const std::vector<int>& castIds);
 
     int actorCount() const { return static_cast<int>(actors.size()); }
